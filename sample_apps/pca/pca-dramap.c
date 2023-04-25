@@ -71,9 +71,9 @@ void dump_points(int **vals, int rows, int cols)
    {
       for (j = 0; j < cols; j++)
       {
-         dprintf("%5d ",vals[i][j]);
+         printf("%5d ",vals[i][j]);
       }
-      dprintf("\n");
+      printf("\n");
    }
 }
 
@@ -153,15 +153,54 @@ int main(int argc, char **argv) {
 
    /* ++++++++++ START DRAM-AP  ++++++++++ */ 
 
-   input_file_handler input_matrix;
-   input_matrix.data = malloc(sizeof(int) * num_rows * num_cols);
-   input_matrix.size = (unsigned long long) num_rows * num_cols; // file handler containing metadata data and size
+   int* meanVec; // allocate at non-DRAM_AP region
+   int* src1_v;
+   int* src2_v;
 
-   dram_ap_fld(matrix, &input_matrix, num_rows, num_cols);
+   input_file_handler matrix_fd;
+   matrix_fd.data = malloc(sizeof(int) * num_rows * num_cols);
+   matrix_fd.size = (unsigned long long) num_rows * num_cols; // file handler containing metadata data and size
 
-   const int BLOCK_FACTOR = 2;
+
+   const int BLOCK_FACTOR = 2; // concurrently two vec ops
    int vl = num_cols; // matrix_len
+   int bit_len = 32;
+   int group_1 = 0;
+   int group_2 = 1;
+
+   meanVec = malloc(num_rows); // host memory region
    
+   dram_ap_mmap(matrix, &matrix_fd, num_rows, num_cols);
+   dram_ap_valloc(&src1_v, group_1, vl, bit_len);
+   dram_ap_valloc(&src2_v, group_2, vl, bit_len);
+
+
+
+   // calculate mean vector
+
+   for (int r = 0; r < num_rows; r += BLOCK_FACTOR) {
+
+   		int tmp1 = 0, tmp2 = 0;
+   		dram_ap_fld(&matrix_fd, r * num_cols, 1, src1_v, vl, bit_len, 0);
+   		dram_ap_fld(&matrix_fd, (r + 1) * num_cols, 1, src2_v, vl, bit_len, 0);
+
+   		dram_ap_vredsum(&tmp1, src1_v, vl, bit_len);
+   		dram_ap_vredsum(&tmp2, src2_v, vl, bit_len);
+   		
+   		tmp1 = tmp1 / num_cols; // is this calculated at the host?
+   		tmp2 = tmp2 / num_cols; // is this calculated at the host?
+
+   		meanVec[r] = tmp1; // send to host mem region leveraging the DCA?
+   		meanVec[r+1] = tmp2;
+   }
+
+
+
+
+
+   
+
+
 
    
 
@@ -180,6 +219,12 @@ int main(int argc, char **argv) {
    /* CPU kernel */
    // Compute the mean and the covariance
    calc_mean(matrix, mean);
+
+   // for (int i=0;i<num_rows;i++) {
+   // 	printf("%d ", mean[i]);
+   // }
+   // printf("\n");
+
    calc_cov(matrix, mean, cov); 
 
    dump_points(cov, num_rows, num_rows);

@@ -7,7 +7,7 @@ typedef struct {
    unsigned long long size;
 } input_file_handler;
 
-inline void dram_ap_fld(int** input_matrix, input_file_handler* fd_struct, int num_rows, int num_cols) // helper function to emulate loading from file into input_file_handler
+inline void dram_ap_mmap(int** input_matrix, input_file_handler* fd_struct, int num_rows, int num_cols) // helper function to emulate loading from file into input_file_handler
 {
 	int i, j;
    
@@ -18,6 +18,26 @@ inline void dram_ap_fld(int** input_matrix, input_file_handler* fd_struct, int n
         	fd_struct->data[i * num_rows + j] = input_matrix[i][j];
      	}
    	}
+}
+
+inline void dram_ap_valloc(int **src_v, int group_id, unsigned long long vl, int bit_len)
+{	
+	*src_v = malloc(vl * sizeof(int));
+	return;
+}
+
+inline void dram_ap_fld(input_file_handler* matrix_fd, int offset, int stride_dist, int *src_v, unsigned long long vl, int bit_len, int orientation)
+{
+	for (unsigned long long i = 0; i < vl; i++) {
+		src_v[i] = matrix_fd->data[offset * stride_dist + i];
+	}
+}
+
+inline void dram_ap_vredsum(int *scalar, int* src_v, unsigned long long vl, int bit_len)
+{
+	for (int i = 0; i < vl; i++) {
+		*scalar += src_v[i];
+	}
 }
 
 
