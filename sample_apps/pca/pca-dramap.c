@@ -127,6 +127,40 @@ void calc_cov(int **matrix, int *mean, int **cov) {
    }   
 }
 
+void dramap_calc_mean_naive(int* meanVec, input_file_handler* matrix_fd, int num_rows, int num_cols) {
+
+	int vl = num_cols; // matrix_len
+   	int bit_len = 32;
+   	int group_1 = 0;
+   	int group_2 = 1;
+
+	const int BLOCK_FACTOR = 2; // concurrently two vec ops
+
+   	int* tmp_src1_v;
+   	int* tmp_src2_v;
+   	
+   	dram_ap_valloc(&tmp_src1_v, group_1, vl, bit_len);
+   	dram_ap_valloc(&tmp_src2_v, group_2, vl, bit_len);
+
+   	for (int r = 0; r < num_rows; r += BLOCK_FACTOR) {
+
+   		int tmp1 = 0, tmp2 = 0;
+
+   		dram_ap_fld(matrix_fd, r * num_cols, 1, tmp_src1_v, vl, bit_len, 0); // concurrently fload?
+   		dram_ap_fld(matrix_fd, (r + 1) * num_cols, 1, tmp_src2_v, vl, bit_len, 0);
+
+   		dram_ap_vredsum(&tmp1, tmp_src1_v, vl, bit_len);
+   		dram_ap_vredsum(&tmp2, tmp_src2_v, vl, bit_len);
+   		
+   		tmp1 = tmp1 / num_cols; // calculated at the host?
+   		tmp2 = tmp2 / num_cols; 
+
+   		meanVec[r] = tmp1; // send to host mem region leveraging the DCA?
+   		meanVec[r+1] = tmp2;
+
+   	}
+}
+
 
 int main(int argc, char **argv) {
    
@@ -153,47 +187,40 @@ int main(int argc, char **argv) {
 
    /* ++++++++++ START DRAM-AP  ++++++++++ */ 
 
-   int* meanVec; // allocate at non-DRAM_AP region
-   int* src1_v;
-   int* src2_v;
+   // NOTE: there might be a better implementation. 
+   // Current implementation's performance might be bottlenecked by file I/O
 
-   input_file_handler matrix_fd;
+   input_file_handler matrix_fd; // file handler containing metadata data and size
    matrix_fd.data = malloc(sizeof(int) * num_rows * num_cols);
-   matrix_fd.size = (unsigned long long) num_rows * num_cols; // file handler containing metadata data and size
+   matrix_fd.size = (unsigned long long) num_rows * num_cols; 
+
+   dram_ap_mmap(matrix, &matrix_fd, num_rows, num_cols); // emulate dramap-specific MMAP, which returns a file_handler that contains data file's meta-data
+
+   // ++ START calculate the mean vector ++ //
+   int* meanVec; // allocate at non-DRAM_AP region
+   meanVec = malloc(num_rows); // allocate for host memory region
+   dramap_calc_mean_naive(meanVec, &matrix_fd, num_rows, num_cols);
+   // ++ END calculate the mean vector ++ //
 
 
-   const int BLOCK_FACTOR = 2; // concurrently two vec ops
-   int vl = num_cols; // matrix_len
-   int bit_len = 32;
-   int group_1 = 0;
-   int group_2 = 1;
+   // // ++ START calculate the covariance matrix ++ //
 
-   meanVec = malloc(num_rows); // host memory region
-   
-   dram_ap_mmap(matrix, &matrix_fd, num_rows, num_cols);
-   dram_ap_valloc(&src1_v, group_1, vl, bit_len);
-   dram_ap_valloc(&src2_v, group_2, vl, bit_len);
+   // int* tmp_mean_v; // different from meanVec, it contains replicas of meanVec[i]
+   // int* tmp_src1_v;
+   // int* tmp_src2_v;
+
+   // for (int i = 0; i < num_rows; i += 1) {
+   // 		for (int j = 0; j < num_cols; j += 1) {
+
+   // 			dram_ap_fld(&matrix_fd, i * num_cols, 1, tmp_src1_v, vl, bit_len, 0);
+   // 			dram_ap_fld(&matrix_fd, j * num_cols, 1, tmp_src1_v, vl, bit_len, 0);
 
 
 
-   // calculate mean vector
+   // 		}
+   // }
 
-   for (int r = 0; r < num_rows; r += BLOCK_FACTOR) {
-
-   		int tmp1 = 0, tmp2 = 0;
-   		dram_ap_fld(&matrix_fd, r * num_cols, 1, src1_v, vl, bit_len, 0);
-   		dram_ap_fld(&matrix_fd, (r + 1) * num_cols, 1, src2_v, vl, bit_len, 0);
-
-   		dram_ap_vredsum(&tmp1, src1_v, vl, bit_len);
-   		dram_ap_vredsum(&tmp2, src2_v, vl, bit_len);
-   		
-   		tmp1 = tmp1 / num_cols; // is this calculated at the host?
-   		tmp2 = tmp2 / num_cols; // is this calculated at the host?
-
-   		meanVec[r] = tmp1; // send to host mem region leveraging the DCA?
-   		meanVec[r+1] = tmp2;
-   }
-
+   // // ++ END calculate the covariance matrix ++ //
 
 
 
