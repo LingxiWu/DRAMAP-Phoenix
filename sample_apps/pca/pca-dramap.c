@@ -146,8 +146,8 @@ void dramap_calc_mean_naive(int* meanVec, input_file_handler* matrix_fd, int num
 
    		int tmp1 = 0, tmp2 = 0;
 
-   		dram_ap_fld(matrix_fd, r * num_cols, 1, tmp_src1_v, vl, bit_len, 0); // concurrently fload?
-   		dram_ap_fld(matrix_fd, (r + 1) * num_cols, 1, tmp_src2_v, vl, bit_len, 0);
+   		dram_ap_fld(matrix_fd, r * num_cols, 1, tmp_src1_v, vl, bit_len, 1); // concurrently fload?
+   		dram_ap_fld(matrix_fd, (r + 1) * num_cols, 1, tmp_src2_v, vl, bit_len, 1);
 
    		dram_ap_vredsum(&tmp1, tmp_src1_v, vl, bit_len);
    		dram_ap_vredsum(&tmp2, tmp_src2_v, vl, bit_len);
@@ -159,6 +159,64 @@ void dramap_calc_mean_naive(int* meanVec, input_file_handler* matrix_fd, int num
    		meanVec[r+1] = tmp2;
 
    	}
+
+   	free(tmp_src1_v);
+   	free(tmp_src2_v);
+}
+
+void dramap_calc_cov_naive(int** covMat, input_file_handler* matrix_fd, int* meanVec, int num_rows, int num_cols) {
+	   
+   int group_1 = 0;
+   int vl = num_cols;
+   int bit_len = 32;
+
+   int* tmp_src1_v;
+   int* tmp_src2_v;
+   int* mean_i_v; 	// stores the replicas of the ith element of meanVec
+   int* mean_j_v;	// stores the replicas of the jth element of meanVec
+   int* tmp_res1_v;
+   int* tmp_res2_v;
+   int* tmp_res3_v;
+
+   dram_ap_valloc(&tmp_src1_v, group_1, vl, bit_len);
+   dram_ap_valloc(&tmp_src2_v, group_1, vl, bit_len);
+   dram_ap_valloc(&tmp_res1_v, group_1, vl, bit_len);
+   dram_ap_valloc(&tmp_res2_v, group_1, vl, bit_len);
+   dram_ap_valloc(&tmp_res3_v, group_1, vl, bit_len);
+   dram_ap_valloc(&mean_i_v, group_1, vl, bit_len);
+   dram_ap_valloc(&mean_j_v, group_1, vl, bit_len);
+
+   int sum;
+   for (int i = 0; i < num_rows; i++) {
+
+   		dram_ap_brdcst(meanVec[i], mean_i_v, vl, bit_len);
+   		dram_ap_fld(matrix_fd, i * num_cols, 1, tmp_src1_v, vl, bit_len, 1);
+
+   		for (int j = i; j < num_rows; j++) {
+
+   			sum = 0;
+
+   			dram_ap_brdcst(meanVec[j], mean_j_v, vl, bit_len);
+   			dram_ap_fld(matrix_fd, j * num_cols, 1, tmp_src2_v, vl, bit_len, 1);
+
+   			dram_ap_vsub(tmp_res1_v, tmp_src1_v, mean_i_v, vl, bit_len);
+   			dram_ap_vsub(tmp_res2_v, tmp_src2_v, mean_j_v, vl, bit_len);
+
+   			dram_ap_vmul(tmp_res3_v, tmp_res1_v, tmp_res2_v, vl, bit_len);
+   			dram_ap_vredsum(&sum, tmp_res3_v, vl, bit_len);
+
+   			covMat[i][j] = covMat[j][i] = sum/(num_cols-1);
+
+   		}
+   }
+
+   free(tmp_src1_v);
+   free(tmp_src2_v);
+   free(tmp_res1_v);
+   free(tmp_res2_v);
+   free(tmp_res3_v);
+   free(mean_i_v);
+   free(mean_j_v);
 }
 
 
@@ -183,6 +241,7 @@ int main(int argc, char **argv) {
    generate_points(matrix, num_rows, num_cols);
    
    // Print the points
+   printf("\n input matrix: \n");
    dump_points(matrix, num_rows, num_cols);
 
    /* ++++++++++ START DRAM-AP  ++++++++++ */ 
@@ -196,41 +255,22 @@ int main(int argc, char **argv) {
 
    dram_ap_mmap(matrix, &matrix_fd, num_rows, num_cols); // emulate dramap-specific MMAP, which returns a file_handler that contains data file's meta-data
 
-   // ++ START calculate the mean vector ++ //
+   // DRAM-AP calculate the mean vector //
    int* meanVec; // allocate at non-DRAM_AP region
-   meanVec = malloc(num_rows); // allocate for host memory region
+   meanVec = (int *)malloc(sizeof(int) * num_rows); // allocate for host memory region
    dramap_calc_mean_naive(meanVec, &matrix_fd, num_rows, num_cols);
-   // ++ END calculate the mean vector ++ //
 
+   // DRAM-AP calculate the covariance matrix //
+   int ** covMat;
+   covMat = (int **)malloc(sizeof(int *) * num_rows);
+   for (i=0; i<num_rows; i++) 
+   {
+      covMat[i] = (int *)malloc(sizeof(int) * num_rows);
+   }
+   dramap_calc_cov_naive(covMat, &matrix_fd, meanVec, num_rows, num_cols);
 
-   // // ++ START calculate the covariance matrix ++ //
-
-   // int* tmp_mean_v; // different from meanVec, it contains replicas of meanVec[i]
-   // int* tmp_src1_v;
-   // int* tmp_src2_v;
-
-   // for (int i = 0; i < num_rows; i += 1) {
-   // 		for (int j = 0; j < num_cols; j += 1) {
-
-   // 			dram_ap_fld(&matrix_fd, i * num_cols, 1, tmp_src1_v, vl, bit_len, 0);
-   // 			dram_ap_fld(&matrix_fd, j * num_cols, 1, tmp_src1_v, vl, bit_len, 0);
-
-
-
-   // 		}
-   // }
-
-   // // ++ END calculate the covariance matrix ++ //
-
-
-
-
-   
-
-
-
-   
-
+   printf("\nDRAM AP covariance matrix results: \n");
+   dump_points(covMat, num_rows, num_cols);
 
    /* ++++++++++ END DRAM-AP  ++++++++++ */ 
    
@@ -247,6 +287,7 @@ int main(int argc, char **argv) {
    // Compute the mean and the covariance
    calc_mean(matrix, mean);
 
+   // printf("mean vec: \n");
    // for (int i=0;i<num_rows;i++) {
    // 	printf("%d ", mean[i]);
    // }
@@ -254,6 +295,7 @@ int main(int argc, char **argv) {
 
    calc_cov(matrix, mean, cov); 
 
+   printf("\nCPU baseline results: \n");
    dump_points(cov, num_rows, num_rows);
    /* ++++++++++ END CPU BASELINE  ++++++++++ */ 
 

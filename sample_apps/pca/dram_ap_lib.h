@@ -40,6 +40,29 @@ inline void dram_ap_vredsum(int *scalar, int* src_v, unsigned long long vl, int 
 	}
 }
 
+inline void dram_ap_brdcst(int scalar, int* src_v, unsigned long long vl, int bit_len) 
+{
+	for (int i = 0; i < vl; i++) {
+		src_v[i] = scalar;
+	}
+}
+
+inline void dram_ap_vsub(int* res_v, int* src1_v, int* src2_v, unsigned long long vl, int bit_len)
+{
+	for (int i = 0; i < vl; i++) {
+		res_v[i] = src1_v[i] - src2_v[i];
+	}
+}
+
+inline void dram_ap_vmul(int* res_v, int* src1_v, int* src2_v, unsigned long long vl, int bit_len) 
+{
+	for (int i = 0; i < vl; i++) {
+		res_v[i] = src1_v[i] * src2_v[i];
+	}
+}
+
+
+
 
 
 
