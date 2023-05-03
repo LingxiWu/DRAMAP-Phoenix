@@ -253,7 +253,7 @@ int main(int argc, char **argv) {
    matrix_fd.data = malloc(sizeof(int) * num_rows * num_cols);
    matrix_fd.size = (unsigned long long) num_rows * num_cols; 
 
-   dram_ap_mmap(matrix, &matrix_fd, num_rows, num_cols); // emulate dramap-specific MMAP, which returns a file_handler that contains data file's meta-data
+   dram_ap_fopen(matrix, &matrix_fd, num_rows, num_cols); // emulate dramap-specific fopen, which returns a file_handler that contains data file's meta-data
 
    // DRAM-AP calculate the mean vector //
    int* meanVec; // allocate at non-DRAM_AP region

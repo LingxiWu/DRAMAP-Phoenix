@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
    /* START DRAM_AP MATMUL */
    printf("\n+++ DRAM-AP +++ MatrixMult\n");
 
-   // emulated file handler returned by dram_ap_mmap(..., fname, ...);
+   // emulated file handler returned by dram_ap_fopen(..., fname, ...);
    matrix_file_handler matrix_fd_A;
    matrix_fd_A.data = ((int *)fdata_A);
    matrix_fd_A.size = matrix_len; // this should NOT be matrix_len

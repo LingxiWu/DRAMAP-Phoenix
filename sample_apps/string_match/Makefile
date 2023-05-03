@@ -63,6 +63,8 @@ STR_MATCH_PTHREADS = string_match_pthreads.o
 STR_MATCH_OBJS = string_match.o
 COM_OBJS = MapReduceScheduler.o
 
+STR_MATCH_DRAMAP_OBJS = string_match_dramap.o
+
 PROGS = string_match string_match_serial string_match_pthreads
 
 .PHONY: default clean
@@ -78,6 +80,9 @@ string_match_pthreads: $(COM_OBJS) $(STR_MATCH_PTHREADS)
 	
 string_match: $(COM_OBJS) $(STR_MATCH_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(COM_OBJS) $(STR_MATCH_OBJS) $(LIBS)
+
+string_match_dramap: $(STR_MATCH_DRAMAP_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(STR_MATCH_DRAMAP_OBJS) $(LIBS)	
 
 clean:
 	rm -f $(PROGS) *.o *.a *~ *.tmp *.bak *.log

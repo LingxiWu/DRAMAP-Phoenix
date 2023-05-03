@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
 
    // /* +++++++++++++++++++++++++ START DRAM-AP +++++++++++++++++++++++++ */
 
-   // emulated file handler returned by dram_ap_mmap(..., fname, ...);
+   // emulated file handler returned by dram_ap_fopen(..., fname, ...);
    input_file_handler input_points;
    input_points.data = fdata;
    input_points.size = (unsigned long long) finfo.st_size;

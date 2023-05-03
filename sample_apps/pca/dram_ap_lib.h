@@ -7,7 +7,7 @@ typedef struct {
    unsigned long long size;
 } input_file_handler;
 
-inline void dram_ap_mmap(int** input_matrix, input_file_handler* fd_struct, int num_rows, int num_cols) // helper function to emulate loading from file into input_file_handler
+inline void dram_ap_fopen(int** input_matrix, input_file_handler* fd_struct, int num_rows, int num_cols) // helper function to emulate loading from file into input_file_handler
 {
 	int i, j;
    
