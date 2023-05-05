@@ -37,49 +37,13 @@
 #include <ctype.h>
 #include <time.h>
 
+
 //#include <readline/readline.h>
 //#include <readline/history.h>
 
 #include "stddefines.h"
 
-#define SALT_SIZE 2
-#define MAX_REC_LEN 1024
-#define OFFSET 5
-
-typedef struct {
-  int keys_file_len;
-  char * keys_file; // data
-} str_data_t;
-
-
-/** getnextline()
- *  Function to get the next word
- */
-int getnextline(char* output, int max_len, char* file)
-{
-	int i=0;
-	while(i<max_len-1)
-	{
-		if( file[i] == '\0')
-		{
-			if(i==0)
-				return -1;
-			else
-				return i;
-		}
-		if( file[i] == '\r')
-			return (i+2);
-
-		if( file[i] == '\n' )
-			return (i+1);
-
-		output[i] = file[i];
-		i++;
-	}
-	file+=i;
-	return i;
-}
-
+#include "dram_ap_lib.h"
 
 
 /** string_match()
@@ -128,6 +92,8 @@ void string_match(str_data_t *data_in)
 }
 
 
+// dram_ap_fld(str_data_t* fd, char* src_v, unsigned long long vl, MAX_REC_LEN, 0) 
+
 int main(int argc, char *argv[]) 
 {   
    int fd;
@@ -143,12 +109,6 @@ int main(int argc, char *argv[])
    }
    fname = argv[1];
 
-   // struct timeval starttime,endtime;
-   srand( (unsigned)time( NULL ) );
-
-   
-
-
    // Read in the file
    CHECK_ERROR((fd = open(fname,O_RDONLY)) < 0);
    // Get the file info (for file length)
@@ -157,20 +117,85 @@ int main(int argc, char *argv[])
    CHECK_ERROR((fdata= mmap(0, finfo.st_size + 1,
       PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) == NULL);
 
+	printf("file Size is %ld\n",finfo.st_size);
 
-
-	//dprintf("Encrypted Size is %ld\n",finfo_encrypt.st_size);
-	dprintf("Keys Size is %ld\n",finfo.st_size);
 
    str_data_t str_data;
    str_data.keys_file_len = finfo.st_size;
    str_data.keys_file  = ((char *)fdata);
 
+   /* START DRAMAP BASELINE */
+
+   printf("\nSTART DRAMAP: \n");
+   // str_data = dramap_fopen(fname) --> returns a fd. str_data emulates the dramap fd
+
+   unsigned long long vl = getVlHelper(fname); // NOTE, vl should be dynamically determined by the runtime/compiler. It should not be set by the programmer. this vl is explicitly set for functional simulation only
+   
+
+   char* query1 = "Helloworld";
+   char* query2 = "howareyou";
+   // char* query3 = "ferrari";
+   // char* query4 = "whotheman";
+
+   int num_match1 = 0;
+   int num_match2 = 0;
+
+   int group_1 = 0;
+   char** key_v;
+   char** query1_v;
+   char** query2_v;
+   int* res1_v;
+   int* res2_v;
+
+   // NOTE, vl should be omitted in real implementation 
+   key_v = dram_ap_valloc_char(group_1, vl, MAX_CHAR_LEN); 
+
+   query1_v = dram_ap_valloc_char(group_1, vl, strlen(query1)); 
+   query2_v = dram_ap_valloc_char(group_1, vl, strlen(query2)); 
+   dram_ap_valloc(&res1_v, group_1, vl, 1); 
+   dram_ap_valloc(&res2_v, group_1, vl, 1); 
+
+
+   dram_ap_fld(&str_data, key_v, vl, MAX_CHAR_LEN); 
+   dram_ap_brdcst(query1, query1_v, vl, strlen(query1)); 
+   dram_ap_brdcst(query2, query2_v, vl, strlen(query2)); 
+
+   dram_ap_match(res1_v, key_v, query1_v, vl, strlen(query1)); 
+   dram_ap_match(res2_v, key_v, query2_v, vl, strlen(query2)); 
+   dram_ap_pcl(&num_match1, res1_v, vl, 1); 
+   dram_ap_pcl(&num_match2, res2_v, vl, 1); 
+   
+
+   if (num_match1) {
+   	printf("FOUND Query Word: %s\n", query1);
+   } else {
+   	printf("DID NOT Find Query Word: %s\n", query1);
+   }
+   if (num_match2) {
+   	printf("FOUND Query Word: %s\n", query2);
+   } else {
+   	printf("DID NOT Find Query Word: %s\n", query2);
+   }
+   
+
+
+
+   free(key_v);
+   free(query1_v);
+   free(query2_v);
+   free(res1_v);
+   free(res2_v);
+   
+   printf("END DRAMAP: \n");
+
+
+
+   
 
 
 
    /* START CPU BASELINE */
-   printf("CPU Baseline String Match: Running...\n");
+   printf("\nCPU Baseline String Match: Running...\n");
    string_match(&str_data);
    printf("CPU baseline String Match: Completed \n");
    /* END CPU BASELINE */
