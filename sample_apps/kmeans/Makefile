@@ -55,14 +55,17 @@ endif
 PATH_OUT = ./$(OSTYPE)/
 
 CFLAGS = -Wall $(ARCH) -O3
-LIBS = -lm -lpthread -lrt -lcpc
+# LIBS = -lm -lpthread -lrt -lcpc
+LIBS = -lm -lpthread -lrt
 
 KMEANS_SEQ_OBJS = kmeans-seq.o
 KMEANS_PTHREAD_OBJS = kmeans-pthread.o
 KMEANS_OBJS = kmeans.o
 COM_OBJS = MapReduceScheduler.o
 
-PROGS = kmeans kmeans-seq kmeans-pthread
+KMEANS_DRAMAP_OBJS = kmeans-dramap.o
+
+PROGS = kmeans kmeans-seq kmeans-pthread kmeans-dramap
 
 .PHONY: default clean
 
@@ -70,6 +73,9 @@ all: $(PROGS)
 
 kmeans-seq: $(KMEANS_SEQ_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(KMEANS_SEQ_OBJS) $(LIBS)
+
+kmeans-dramap: $(KMEANS_DRAMAP_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(KMEANS_DRAMAP_OBJS) $(LIBS)
 
 kmeans-pthread: $(KMEANS_PTHREAD_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(KMEANS_PTHREAD_OBJS) $(LIBS)

@@ -63,7 +63,9 @@ WC_OBJS_PTHREADS = wordcount_pthreads.o sort_pthreads.o
 WC_OBJS_SER = wordcount_serial.o
 COM_OBJS = MapReduceScheduler.o
 
-PROGS = wordcount wordcount_pthreads wordcount_serial
+WC_OBJS_DRAMAP = wordcount_dramap.o
+
+PROGS = wordcount wordcount_pthreads wordcount_serial wordcount_dramap
 
 .PHONY: default clean
 
@@ -77,6 +79,9 @@ wordcount_pthreads: $(COM_OBJS) $(WC_OBJS_PTHREADS)
 	
 wordcount_serial: $(WC_OBJS_SER)
 	$(CC) $(CFLAGS) -o $@ $(WC_OBJS_SER) $(LIBS)
+
+wordcount_dramap: $(WC_OBJS_DRAMAP)
+	$(CC) $(CFLAGS) -o $@ $(WC_OBJS_DRAMAP) $(LIBS)
 
 clean:
 	rm -f $(PROGS) *.o *.a *~ *.tmp *.bak *.log
