@@ -219,9 +219,9 @@ void dump_matrix(int **vals, int rows, int cols)
    {
       for (j = 0; j < cols; j++)
       {
-         dprintf("%5d ",vals[i][j]);
+         printf("%5d ",vals[i][j]);
       }
-      dprintf("\n");
+      printf("\n");
    }
 }
 
@@ -287,7 +287,7 @@ int main(int argc, char **argv)
    modified = true;
 
    /* START DRAMAP */
-   
+
    input_file_handler points_fd;
    points_fd.points = points;
    points_fd.size = num_points;
@@ -310,144 +310,147 @@ int main(int argc, char **argv)
    printf("\n\n");
 
 
-   // for (int itr = 0; itr < 5; itr++) {
+   for (int itr = 0; itr < 2; itr++) {
 
-   // }
+      printf("\n +++ Iteration-%d +++ \n\n", itr);
 
-   
+      int* min_dist_v = dram_ap_valloc_2(group_id, vl, dim_bit_len);
+      int** dist_matrix = dram_ap_valloc_3(group_id, vl, num_means);
+      dram_ap_brdcst_2(MAX_INT, min_dist_v, vl, pts_bit_len); 
 
+      // distance calculation
+      for (int i = 0; i < num_means; i++) { // for all centroid
 
-   
-   int* min_dist_v = dram_ap_valloc_2(group_id, vl, dim_bit_len);
-   int** dist_matrix = dram_ap_valloc_3(group_id, vl, num_means);
-   dram_ap_brdcst_2(MAX_INT, min_dist_v, vl, pts_bit_len); 
-
-   // distance calculation
-   for (int i = 0; i < num_means; i++) { // for all centroid
-
-      int** mean_v = dram_ap_valloc_1(group_id, vl, pts_bit_len);
+         int** mean_v = dram_ap_valloc_1(group_id, vl, pts_bit_len);
       
-      // brdcst means[i] to mean_v
-      dram_ap_brdcst_1(means[i], mean_v, vl, pts_bit_len);    
+         // brdcst means[i] to mean_v
+         dram_ap_brdcst_1(means[i], mean_v, vl, pts_bit_len);    
 
-      // compute dist of pts_v to means_v
-      int* dist_v = dram_ap_valloc_2(group_id, vl, pts_bit_len);
-      dram_ap_brdcst_2(0, dist_v, vl, pts_bit_len);
+         // compute dist of pts_v to means_v
+         int* dist_v = dram_ap_valloc_2(group_id, vl, pts_bit_len);
+         dram_ap_brdcst_2(0, dist_v, vl, pts_bit_len);
 
-      for (int j = 0; j < dim; j++) { // calculate the distance between all points and centroid[i]
+         for (int j = 0; j < dim; j++) { // calculate the distance between all points and centroid[i]
 
-         printf("means_v_dim_%d: ",j);
-         for (int k = 0; k < num_points; k++) {
-            printf("%5d ",mean_v[k][j]);
+            printf("means_v_dim_%d: ",j);
+            for (int k = 0; k < num_points; k++) {
+               printf("%5d ",mean_v[k][j]);
+            }
+            printf("\n");
+
+            int* dist_dim_v = dram_ap_valloc_2(group_id, vl, dim_bit_len);
+            dram_ap_vsub(dist_dim_v, pts_v, mean_v, vl, j * dim_bit_len, dim_bit_len);
+            dram_ap_vabs(dist_dim_v, vl, j * dim_bit_len, dim_bit_len);
+            dram_ap_vacc(dist_v, dist_dim_v, vl, j * dim_bit_len, pts_bit_len);
+
+            printf("dist_dim_v_%d: ",j);
+            for(int i=0;i<vl;i++){
+               printf("%5d ",dist_dim_v[i]);
+            }
+            printf("\n");
+
+
+            free(dist_dim_v);
          }
-         printf("\n");
-
-         int* dist_dim_v = dram_ap_valloc_2(group_id, vl, dim_bit_len);
-         dram_ap_vsub(dist_dim_v, pts_v, mean_v, vl, j * dim_bit_len, dim_bit_len);
-         dram_ap_vabs(dist_dim_v, vl, j * dim_bit_len, dim_bit_len);
-         dram_ap_vacc(dist_v, dist_dim_v, vl, j * dim_bit_len, pts_bit_len);
-
-         printf("dist_dim_v_%d: ",j);
-         for(int i=0;i<vl;i++){
-            printf("%5d ",dist_dim_v[i]);
-         }
-         printf("\n");
-
-
-         free(dist_dim_v);
-      }
-      
-      dram_ap_vmin(min_dist_v, dist_v, vl, pts_bit_len);
-
-      printf("total_dist_v: ");
-      for(int i=0;i<vl;i++){
-         printf("%5d ",dist_v[i]);
-      }
-      printf("\n");
-
-      dram_ap_vcpy(dist_matrix[i], dist_v, num_points, pts_bit_len); // use vcpy
-
-
-      free(dist_v);
-      printf("\n");
-   }
-
-   printf("min_dist_v\n");
-   for(int i=0;i<vl;i++){
-      printf("%5d ",min_dist_v[i]);
-   }
-   printf("\n");
-   
-
-   // for each centroid, produce one-hot encoding, aggregate results, and make new centroids
-   for (int i = 0; i < num_means; i++) { // produce new means
-      int* mask_v = dram_ap_valloc_2(group_id, vl, 1); // for each centroid, produce a mask indicating the closest centroid to each point
-      dram_ap_brdcst_2(0, mask_v, vl, pts_bit_len);
-      
-      dram_ap_vmatch(mask_v, min_dist_v, dist_matrix[i], num_points, pts_bit_len);
-
-      printf("dist_matrix[%d]: ",i);
-      for (int j = 0; j < num_points; j++){
-         printf("%d ", dist_matrix[i][j]);
-      }
-      printf("\n");
-
-      printf("mask_v:");
-      for (int j = 0; j < num_points; j++){
-         printf("%d ", mask_v[j]);
-      }
-      printf("\n\n");
-
-      
-      for (int j=0; j<dim; j++) {
          
-         printf("pts_dim %d: ",j);
-         int* pts_dim = (int *)malloc(sizeof(int) * vl); // for all dim_x of all points
-         for (int i=0; i<num_points; i++){
-            pts_dim[i] = pts_v[i][j];
-            printf("%5d ",pts_dim[i]);
+         dram_ap_vmin(min_dist_v, dist_v, vl, pts_bit_len);
+
+         printf("total_dist_v: ");
+         for(int i=0;i<vl;i++){
+            printf("%5d ",dist_v[i]);
          }
-         int dim_sum = dram_ap_vredsum(pts_dim, mask_v, num_points, j * dim_bit_len, pts_bit_len);
-         int num_pts = dram_ap_pcl(mask_v, num_points);
-         int new_mean_dim = dim_sum / num_pts;
-         printf(" dim_%d_sum: %5d, new_mean_dim_%d: %d",j, dim_sum, j, new_mean_dim);
          printf("\n");
 
-         means[i][j] = new_mean_dim;
+         dram_ap_vcpy(dist_matrix[i], dist_v, num_points, pts_bit_len); // use vcpy
 
 
-         free(pts_dim);
+         free(dist_v);
+         printf("\n");
       }
 
-      printf("\n");
-
-
-      free(mask_v);
-   }
-
-   for (int i = 0; i < dim; i++) {
-      printf("new means_dim %d: ",i);
-      for (int j = 0; j < num_means; j++) {
-         printf("%5d ", means[j][i]);
+      printf("min_dist_v\n");
+      for(int i=0;i<vl;i++){
+         printf("%5d ",min_dist_v[i]);
       }
       printf("\n");
-   }
+   
+
+      // for each centroid, produce one-hot encoding, aggregate results, and make new centroids
+      for (int i = 0; i < num_means; i++) { // produce new means
+         int* mask_v = dram_ap_valloc_2(group_id, vl, 1); // for each centroid, produce a mask indicating the closest centroid to each point
+         dram_ap_brdcst_2(0, mask_v, vl, pts_bit_len);
+         
+         dram_ap_vmatch(mask_v, min_dist_v, dist_matrix[i], num_points, pts_bit_len);
+
+         printf("dist_matrix[%d]: ",i);
+         for (int j = 0; j < num_points; j++){
+            printf("%d ", dist_matrix[i][j]);
+         }
+         printf("\n");
+
+         printf("mask_v:");
+         for (int j = 0; j < num_points; j++){
+            printf("%d ", mask_v[j]);
+         }
+         printf("\n\n");
+
+         
+         for (int j=0; j<dim; j++) {
+            
+            printf("pts_dim %d: ",j);
+            int* pts_dim = (int *)malloc(sizeof(int) * vl); // for all dim_x of all points
+            for (int i=0; i<num_points; i++){
+               pts_dim[i] = pts_v[i][j];
+               printf("%5d ",pts_dim[i]);
+            }
+            int dim_sum = dram_ap_vredsum(pts_dim, mask_v, num_points, j * dim_bit_len, pts_bit_len);
+            int num_pts = dram_ap_pcl(mask_v, num_points);
+            int new_mean_dim = dim_sum / num_pts;
+            printf(" dim_%d_sum: %5d, new_mean_dim_%d: %d",j, dim_sum, j, new_mean_dim);
+            printf("\n");
+
+            means[i][j] = new_mean_dim;
 
 
-   free(dist_matrix);
-   free(min_dist_v);
+            free(pts_dim);
+         }
+
+         printf("\n");
+
+         free(mask_v);
+      }
+
+      for (int i = 0; i < dim; i++) {
+         printf("new means_dim %d: ",i);
+         for (int j = 0; j < num_means; j++) {
+            printf("%5d ", means[j][i]);
+         }
+         printf("\n");
+      }
+
+
+      free(dist_matrix);
+      free(min_dist_v);
 
    
-   for (int j = 0; j < dim; j++) {
-      printf("pts_dim %d: ",j);
-      for (int i = 0; i < num_points; i++) {
-         printf("%5d ", pts_v[i][j]);
-      }
+      for (int j = 0; j < dim; j++) {
+         printf("pts_dim %d: ",j);
+         for (int i = 0; i < num_points; i++) {
+            printf("%5d ", pts_v[i][j]);
+         }
+
       printf("\n");
    }
 
 
+      
+
+   }
    free(pts_v);
+
+
+   
+   
 
 
 
@@ -457,7 +460,7 @@ int main(int argc, char **argv)
 
 
    /* START CPU BASELINE */
-   dprintf("\n\nStarting CPU baseline iterative algorithm\n");
+   printf("\n\nStarting CPU baseline iterative algorithm\n");
    
    
    while (modified) 
@@ -470,17 +473,19 @@ int main(int argc, char **argv)
    }
    
    
-   dprintf("\n\nFinal Means:\n");
+   printf("\n\nFinal Means:\n");
    dump_matrix(means, num_means, dim);
    
    dprintf("Cleaning up\n");
    for (i=0; i<num_means; i++) {
       free(means[i]);
    }
-   free(means);
+   
    for (i=0; i<num_points; i++) {
       free(points[i]);
    }
+
+   free(means);
    free(points);
 
    /* END CPU BASELINE */
