@@ -34,7 +34,7 @@
 #include "stddefines.h"
 
 #define DEF_NUM_POINTS 100000
-#define DEF_NUM_MEANS 100
+#define DEF_NUM_MEANS 20
 #define DEF_DIM 3
 #define DEF_GRID_SIZE 1000
 
@@ -260,15 +260,34 @@ int main(int argc, char **argv)
    
    dprintf("\n\nStarting iterative algorithm\n");
    
-   
+
+   struct timeval starttime,endtime;
+   srand( (unsigned)time( NULL ) );
+
+   gettimeofday(&starttime,0);
+
+   int iter = 0;
+
    while (modified) 
    {
+      iter += 1;
       modified = false;
       dprintf(".");
       
       find_clusters(points, means, clusters);
       calc_means(points, means, clusters);
    }
+
+   printf("iter: %d\n",iter);
+
+   gettimeofday(&endtime,0);
+
+   long kernel_time_elapsed = 0;
+   kernel_time_elapsed += (endtime.tv_sec - starttime.tv_sec) * 1000000 + endtime.tv_usec - starttime.tv_usec;
+
+   printf("Completed %ld\n",(kernel_time_elapsed));
+   
+   
    
    
    dprintf("\n\nFinal Means:\n");

@@ -62,7 +62,7 @@ void matrix_mult(mm_data_t *data_in)
 		if(i%data_in->matrix_len == 0)
 			dprintf("\n");
 		dprintf("%d  ",data_in->matrix_A[i]);
-      printf("i: %d, data_in->matrix_A[i]: %d\n",i,data_in->matrix_A[i]);
+      // printf("i: %d, data_in->matrix_A[i]: %d\n",i,data_in->matrix_A[i]);
 	}
 	dprintf("\n\n");
 
@@ -85,7 +85,7 @@ void matrix_mult(mm_data_t *data_in)
       for (c = k; c < end_k && c < data_in->matrix_len; c++)
       {
                int temp = ( data_in->matrix_A[ (data_in->matrix_len)*a + c] * data_in->matrix_B[ (data_in->matrix_len)*c + b]);
-               printf("temp: %d\n", temp);
+               // printf("temp: %d\n", temp);
                data_in->matrix_out[(data_in->matrix_len)*a + b] += temp;
                   
       }
@@ -170,11 +170,21 @@ int main(int argc, char *argv[])
    //gettimeofday(&starttime,0);
    
    
+   
+
+   struct timeval starttime,endtime;
+   srand( (unsigned)time( NULL ) );
+   gettimeofday(&starttime,0);
+   
    memset(mm_data.matrix_out, 0, file_size);
    matrix_mult(&mm_data);
 
 
-   //printf("MatrixMult: Multiply Completed time = %ld\n", (endtime.tv_sec - starttime.tv_sec));
+   gettimeofday(&endtime,0);
+   long kernel_time_elapsed = 0;
+   kernel_time_elapsed += (endtime.tv_sec - starttime.tv_sec) * 1000000 + endtime.tv_usec - starttime.tv_usec;
+
+   printf("Completed %ld\n",(kernel_time_elapsed));
 
    CHECK_ERROR(munmap(fdata_A, file_size + 1) < 0);
    CHECK_ERROR(close(fd_A) < 0);

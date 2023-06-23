@@ -72,11 +72,20 @@ int main(int argc, char *argv[]) {
    CHECK_ERROR((fdata = mmap(0, finfo.st_size + 1, 
       PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) == NULL);
 
+   struct timeval starttime,endtime;
+   srand( (unsigned)time( NULL ) );
+
+   gettimeofday(&starttime,0);
+
+
+   
+
+   
 
    POINT_T *points = (POINT_T*)fdata;
    long long n = (long long) finfo.st_size / sizeof(POINT_T);
    long long SX_ll = 0, SY_ll = 0, SXX_ll = 0, SYY_ll = 0, SXY_ll = 0;
-   
+   printf("Number of points: %lld\n", n);
    // ADD UP RESULTS
    for (i = 0; i < n; i++)
    {
@@ -100,6 +109,13 @@ int main(int argc, char *argv[]) {
    xbar = (double)SX_ll / n;
    ybar = (double)SY_ll / n;
    r2 = (double)(n*SXY - SX*SY) * (n*SXY - SX*SY) / ((n*SXX - SX*SX)*(n*SYY - SY*SY));
+
+   gettimeofday(&endtime,0);
+
+   long kernel_time_elapsed = 0;
+   kernel_time_elapsed += (endtime.tv_sec - starttime.tv_sec) * 1000000 + endtime.tv_usec - starttime.tv_usec;
+
+   printf("Completed %ld\n",(kernel_time_elapsed));
 
 
    printf("Linear Regression Serial Results:\n");

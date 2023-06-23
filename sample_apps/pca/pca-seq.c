@@ -33,11 +33,16 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
+
+
 #include "stddefines.h"
 
 #define DEF_GRID_SIZE 100  // all values in the matrix are from 0 to this value 
 #define DEF_NUM_ROWS 10
 #define DEF_NUM_COLS 10
+
+
 
 int num_rows;
 int num_cols;
@@ -189,8 +194,24 @@ int main(int argc, char **argv) {
    
    /* CPU kernel */
    // Compute the mean and the covariance
+   struct timeval starttime,endtime;
+   srand( (unsigned)time( NULL ) );
+
+   gettimeofday(&starttime,0);
+
    calc_mean(matrix, mean);
    calc_cov(matrix, mean, cov);
+
+   gettimeofday(&endtime,0);
+
+   long kernel_time_elapsed = 0;
+   kernel_time_elapsed += (endtime.tv_sec - starttime.tv_sec) * 1000000 + endtime.tv_usec - starttime.tv_usec;
+
+   printf("Completed %ld\n",(kernel_time_elapsed));
+
+
+
+   
    
    
    dump_points(cov, num_rows, num_rows);
